@@ -216,11 +216,11 @@ static jl_callptr_t _jl_compile_codeinst(
     return fptr;
 }
 
-void jl_generate_ccallable(void *llvmmod, void *sysimg_handle, jl_value_t *declrt, jl_value_t *sigt, jl_codegen_params_t &params);
+const char *jl_generate_ccallable(void *llvmmod, void *sysimg_handle, jl_value_t *declrt, jl_value_t *sigt, jl_codegen_params_t &params);
 
 // compile a C-callable alias
-extern "C" JL_DLLEXPORT
-void jl_compile_extern_c(void *llvmmod, void *p, void *sysimg, jl_value_t *declrt, jl_value_t *sigt)
+extern "C"
+int jl_compile_extern_c(void *llvmmod, void *p, void *sysimg, jl_value_t *declrt, jl_value_t *sigt)
 {
     JL_LOCK(&codegen_lock);
     uint64_t compiler_start_time = jl_hrtime();
@@ -231,20 +231,25 @@ void jl_compile_extern_c(void *llvmmod, void *p, void *sysimg, jl_value_t *declr
     Module *into = (Module*)llvmmod;
     if (into == NULL)
         into = jl_create_llvm_module("cextern");
-    jl_generate_ccallable(into, sysimg, declrt, sigt, *pparams);
+    const char *name = jl_generate_ccallable(into, sysimg, declrt, sigt, *pparams);
+    bool success = true;
     if (!sysimg) {
-        if (p == NULL) {
+        if (jl_ExecutionEngine->getGlobalValueAddress(name)) {
+            success = false;
+        }
+        if (success && p == NULL) {
             jl_jit_globals(params.globals);
             assert(params.workqueue.empty());
             if (params._shared_module)
                 jl_add_to_ee(std::unique_ptr<Module>(params._shared_module));
         }
-        if (llvmmod == NULL)
+        if (success && llvmmod == NULL)
             jl_add_to_ee(std::unique_ptr<Module>(into));
     }
     if (codegen_lock.count == 1)
         jl_cumulative_compile_time += (jl_hrtime() - compiler_start_time);
     JL_UNLOCK(&codegen_lock);
+    return success;
 }
 
 bool jl_type_mappable_to_c(jl_value_t *ty);
@@ -289,7 +294,9 @@ void jl_extern_c(jl_value_t *declrt, jl_tupletype_t *sigt)
     JL_GC_POP();
 
     // create the alias in the current runtime environment
-    jl_compile_extern_c(NULL, NULL, NULL, declrt, (jl_value_t*)sigt);
+    int success = jl_compile_extern_c(NULL, NULL, NULL, declrt, (jl_value_t*)sigt);
+    if (!success)
+        jl_error("@ccallable was already defined for this method name");
 }
 
 // this compiles li and emits fptr
@@ -695,7 +702,7 @@ JuliaOJIT::JuliaOJIT(TargetMachine &TM, LLVMContext *LLVMCtx)
 void JuliaOJIT::addGlobalMapping(StringRef Name, uint64_t Addr)
 {
     std::string MangleName = getMangledName(Name);
-    JD.define(orc::absoluteSymbols({{ES.intern(MangleName), JITEvaluatedSymbol::fromPointer((void*)Addr)}}));
+    cantFail(JD.define(orc::absoluteSymbols({{ES.intern(MangleName), JITEvaluatedSymbol::fromPointer((void*)Addr)}})));
 }
 
 void JuliaOJIT::addModule(std::unique_ptr<Module> M)
@@ -732,10 +739,8 @@ void JuliaOJIT::addModule(std::unique_ptr<Module> M)
     cantFail(CompileLayer.add(JD, orc::ThreadSafeModule(std::move(M), TSCtx), key));
     // force eager compilation (for now), due to memory management specifics
     // (can't handle compilation recursion)
-    for (auto Name : NewExports) {
-        auto Sym = ES.lookup({&JD}, Name);
-        (void)*Sym;
-    }
+    for (auto Name : NewExports)
+        cantFail(ES.lookup({&JD}, Name));
 
 }
 
@@ -752,7 +757,9 @@ JL_JITSymbol JuliaOJIT::findSymbol(StringRef Name, bool ExportedSymbolsOnly)
             return *Sym;
     }
     auto Sym = ES.lookup({&JD}, Name);
-    return *Sym;
+    if (Sym)
+        return *Sym;
+    return Sym.takeError();
 }
 
 JL_JITSymbol JuliaOJIT::findUnmangledSymbol(StringRef Name)
@@ -762,14 +769,14 @@ JL_JITSymbol JuliaOJIT::findUnmangledSymbol(StringRef Name)
 
 uint64_t JuliaOJIT::getGlobalValueAddress(StringRef Name)
 {
-    auto addr = findSymbol(getMangledName(Name), false).getAddress();
-    return addr ? addr.get() : 0;
+    auto addr = findSymbol(getMangledName(Name), false);
+    return addr ? addr.getAddress().get() : 0;
 }
 
 uint64_t JuliaOJIT::getFunctionAddress(StringRef Name)
 {
-    auto addr = findSymbol(getMangledName(Name), false).getAddress();
-    return addr ? addr.get() : 0;
+    auto addr = findSymbol(getMangledName(Name), false);
+    return addr ? addr.getAddress().get() : 0;
 }
 
 static int globalUniqueGeneratedNames;
