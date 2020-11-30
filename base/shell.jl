@@ -288,7 +288,7 @@ avoids the problem with `%` and the `windows_verbatim` flag:
 
 ```julia
 cmdargs = shell_escape_wincmd("Passing args with %cmdargs% works 100%!")
-run(setenv(`cmd /C to_run %cmdargs%`, "cmdargs" => cmdargs))
+run(setenv(`cmd /C echo %cmdargs%`, "cmdargs" => cmdargs))
 ```
 
 !warning
