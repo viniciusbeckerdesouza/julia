@@ -558,6 +558,14 @@ JL_DLLEXPORT void jl_switchto(jl_task_t **pt)
 
 JL_DLLEXPORT JL_NORETURN void jl_no_exc_handler(jl_value_t *e)
 {
+    // NULL exception objects are used to denote the top of the exception stack.
+    // we don't have an exception handler to handle the full stack, so at least
+    // look at the actual exception on the top of the stack (if any).
+    jl_ptls_t ptls = jl_get_ptls_states();
+    jl_excstack_t *excstack = ptls->current_task->excstack;
+    if (!e && excstack && excstack->top)
+        e = jl_excstack_raw(excstack)[excstack->top-1].jlvalue;
+
     jl_printf((JL_STREAM*)STDERR_FILENO, "fatal: error thrown and no exception handler available.\n");
     jl_static_show((JL_STREAM*)STDERR_FILENO, e);
     jl_printf((JL_STREAM*)STDERR_FILENO, "\n");
