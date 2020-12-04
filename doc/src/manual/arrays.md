@@ -1,33 +1,12 @@
 # [Multi-dimensional Arrays](@id man-multi-dim-arrays)
 
-Julia, like most technical computing languages, provides a first-class array implementation. Most
-technical computing languages pay a lot of attention to their array implementation at the expense
-of other containers. Julia does not treat arrays in any special way. The array library is implemented
-almost completely in Julia itself, and derives its performance from the compiler, just like any
-other code written in Julia. As such, it's also possible to define custom array types by inheriting
-from [`AbstractArray`](@ref). See the [manual section on the AbstractArray interface](@ref man-interface-array) for more details
-on implementing a custom array type.
+Julia, como a maioria das linguagens de computação técnica, fornece uma implementação de array de primeira classe. A maioria das linguagens de computação técnica presta muita atenção à implementação de array em detrimento de outros containers. Julia não trata matrizes de nenhuma maneira especial. A biblioteca de array é implementada quase completamente na própria Julia e deriva seu desempenho do compilador, assim como qualquer outro código escrito em Julia. Como tal, também é possível definir tipos de array personalizados herdando de AbstractArray. Consulte a [seção do manual na interface AbstractArray] (@ ref man-interface-array) para obter mais detalhes sobre a implementação de um tipo de array personalizado.
 
-An array is a collection of objects stored in a multi-dimensional grid. In the most general case,
-an array may contain objects of type [`Any`](@ref). For most computational purposes, arrays should contain
-objects of a more specific type, such as [`Float64`](@ref) or [`Int32`](@ref).
+Uma matriz é uma coleção de objetos armazenados em uma grade multidimensional. No caso mais geral, um array pode conter objetos do tipo Any. Para a maioria dos propósitos computacionais, os arrays devem conter objetos de um tipo mais específico, como Float64 ou Int32.
 
-In general, unlike many other technical computing languages, Julia does not expect programs to
-be written in a vectorized style for performance. Julia's compiler uses type inference and generates
-optimized code for scalar array indexing, allowing programs to be written in a style that is convenient
-and readable, without sacrificing performance, and using less memory at times.
+Em geral, ao contrário de muitas outras linguagens de computação técnica, Julia não espera que os programas sejam escritos em um estilo vetorizado para desempenho. O compilador de Julia usa inferência de tipo e gera código otimizado para indexação de array escalar, permitindo que programas sejam escritos em um estilo que seja conveniente e legível, sem sacrificar o desempenho e usando menos memória às vezes.
 
-In Julia, all arguments to functions are [passed by
-sharing](https://en.wikipedia.org/wiki/Evaluation_strategy#Call_by_sharing)
-(i.e. by pointers). Some technical computing languages pass arrays by value, and
-while this prevents accidental modification by callees of a value in the caller,
-it makes avoiding unwanted copying of arrays difficult. By convention, a
-function name ending with a `!` indicates that it will mutate or destroy the
-value of one or more of its arguments (compare, for example, [`sort`](@ref) and [`sort!`](@ref)).
-Callees must make explicit copies to ensure that they don't modify inputs that
-they don't intend to change. Many non- mutating functions are implemented by
-calling a function of the same name with an added `!` at the end on an explicit
-copy of the input, and returning that copy.
+Em Julia, todos os argumentos para funções são passados ​​por compartilhamento (ou seja, por ponteiros). Algumas linguagens de computação técnica passam arrays por valor e, embora isso evite a modificação acidental por chamadas de um valor no chamador, torna difícil evitar a cópia indesejada de arrays. Por convenção, um nome de função que termina com um! indica que irá alterar ou destruir o valor de um ou mais de seus argumentos (compare, por exemplo, classificar e classificar!). Os atendentes devem fazer cópias explícitas para garantir que não modifiquem as entradas que não pretendem alterar. Muitas funções não mutantes são implementadas chamando uma função de mesmo nome com um! no final em uma cópia explícita da entrada e retornando essa cópia.
 
 ## Basic Functions
 
